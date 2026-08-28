@@ -154,11 +154,11 @@ describe('stepEffort', () => {
     expect(stepEffort('rpe', 6, 1)).toBe(6.5)
   })
 
-  it('leaves an untouched cell unlogged when stepped down', () => {
-    // one stray − on a fresh row must not stamp "(RIR 0)" — went to failure — on the set
-    expect(stepEffort('rir', null, -1)).toBe(null)
+  it('starts an empty RIR cell at zero when stepped down, but keeps RPE empty', () => {
+    // an empty RIR cell uses 0 for both arrows, while an empty RPE cell stays unlogged on −
+    expect(stepEffort('rir', null, -1)).toBe(0)
     expect(stepEffort('rpe', null, -1)).toBe(null)
-    expect(stepEffort('rir', undefined, -1)).toBe(null)
+    expect(stepEffort('rir', undefined, -1)).toBe(0)
   })
 
   it('clears the cell again when stepped back off the floor', () => {

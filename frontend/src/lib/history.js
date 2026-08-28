@@ -71,15 +71,15 @@ export const EFFORT = {
   rir: { f: 'rir', hd: 'RIR', step: 0.5, min: 0, max: 10 },
   rpe: { f: 'rpe', hd: 'RPE', step: 0.5, min: 6, max: 10 }
 }
-// One tap of an effort stepper. Empty is not 0 — an unlogged effort must not become "went to
-// failure" from one stray tap — so − on an empty cell leaves it empty, and + starts at the
-// bottom of the scale and walks up from there in even steps. Stepping back off the bottom
-// clears the cell again, so a mistap is undoable. null means "nothing logged"; the caller
+// An empty RIR cell starts at 0 for either arrow, since 0 is the bottom of that scale. An empty
+// RPE cell stays empty when stepped down, so a stray − does not create an unlogged effort; +
+// starts at the bottom of the scale and walks up from there in even steps. Stepping back off the
+// bottom clears the cell again, so a mistap is undoable. null means "nothing logged"; the caller
 // stores that by dropping the key rather than writing a null.
 export function stepEffort(kind, cur, dir) {
   const e = EFFORT[kind]
   if (!e) return cur ?? null
-  if (cur == null) return dir < 0 ? null : e.min
+  if (cur == null) return kind === 'rir' ? e.min : dir < 0 ? null : e.min
   const n = Math.round((cur + dir * e.step) * 100) / 100
   if (dir < 0 && n < e.min) return null
   // only the ceiling is enforced on the way up: a value typed below the floor (nothing stops
