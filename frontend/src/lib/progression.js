@@ -107,10 +107,19 @@ export function policyFor(cfg, routine, mode) {
 
 const round1 = v => Math.round(v * 10) / 10
 // Snap to a loadable multiple of the step. Manual weight controls use this same normalization
-// so fractional increments produce the same number as automatic progression.
-export function snapWeight(v, step) {
+// so fractional increments produce the same number as automatic progression. An optional origin
+// keeps a machine's observed offset (12.5 with a 5 kg step → 7.5, 12.5, 17.5...).
+export function snapWeight(v, step, origin = 0) {
   if (!(step > 0)) return round1(v)
-  return round1(Math.round(v / step) * step)
+  const base = Number.isFinite(Number(origin)) ? Number(origin) : 0
+  return round1(base + Math.round((v - base) / step) * step)
+}
+// A load that is not on the zero-origin grid tells us where a machine's actual grid starts.
+// Until such a load is observed, origin remains zero and existing prescriptions are unchanged.
+const observedOrigin = (weight, step) => {
+  const v = Number(weight)
+  if (!(v > 0) || !(step > 0) || Math.abs(v - snapWeight(v, step)) <= 0.1) return 0
+  return round1(v - Math.floor(v / step) * step)
 }
 // A tap moves by one step. Snapping to the grid keeps the number identical to what progression
 // would prescribe (61.3 → 62.5 with a 1.25 step, not 62.55) — but only when the current value
@@ -132,16 +141,18 @@ export function stepWeight(value, step, direction) {
 // Back off by a factor, landing on something you can actually load. This remains the old policy
 // used by Greyskull and timed progression; linear/double loaded reps use the Epley selector below.
 export function deloadTo(cur, step, factor = DELOAD_FACTOR) {
-  let next = snapWeight(cur * factor, step)
-  if (next >= cur) next = snapWeight(cur - step, step)
-  return Math.max(step, next)
+  const origin = observedOrigin(cur, step)
+  let next = snapWeight(cur * factor, step, origin)
+  if (next >= cur) next = snapWeight(cur - step, step, origin)
+  return Math.max(origin || step, next)
 }
 
-const positiveGridAround = (ideal, step, maxWeight, strictLower) => {
+const positiveGridAround = (ideal, step, maxWeight, strictLower, origin = 0) => {
   if (!(ideal > 0) || !(step > 0) || !(maxWeight > 0)) return []
-  const low = Math.floor(ideal / step) * step
-  const high = Math.ceil(ideal / step) * step
-  const values = [...new Set([low, high].map(v => snapWeight(v, step)))]
+  const base = Number.isFinite(Number(origin)) ? Number(origin) : 0
+  const low = base + Math.floor((ideal - base) / step) * step
+  const high = base + Math.ceil((ideal - base) / step) * step
+  const values = [...new Set([low, high].map(v => snapWeight(v, step, base)))]
   return values
     .filter(v => v > 0 && v <= maxWeight + 1e-9 && (!strictLower || v < maxWeight - 1e-9))
     .sort((a, b) => a - b)
@@ -165,12 +176,13 @@ export function selectDeloadCandidate({ currentWeight, targetWeight, targetReps,
   for (let r = top; r >= bottom; r -= stride) repValues.push(r)
   const target1RM = deloadTarget1RM(baseWeight, upper, factor, perSide)
   if (!(current > 0) || target1RM == null || !repValues.length || !(step > 0)) return null
+  const origin = observedOrigin(current, step)
 
   const candidates = []
   repValues.forEach(candidateReps => {
     const ideal = target1RM / (1 + (perSide ? candidateReps / 2 : candidateReps) / 30)
     const allowCurrent = repsMin != null && candidateReps < upper
-    const grid = positiveGridAround(ideal, step, current, !allowCurrent)
+    const grid = positiveGridAround(ideal, step, current, !allowCurrent, origin)
     if (allowCurrent && !grid.includes(current)) grid.push(current)
     grid.forEach(candidateWeight => {
       const epley = epley1RM(candidateWeight, perSide ? candidateReps / 2 : candidateReps)

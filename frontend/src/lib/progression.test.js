@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   readSession, sessionsFor, stallCount, nextPrescription, applyPrescription,
-  policyFor, defaultIncrement, weightIncrement, epley1RM, deloadTarget1RM,
+  policyFor, defaultIncrement, weightIncrement, epley1RM, deloadTarget1RM, deloadTo,
   deloadFactorOf, DELOAD_FACTOR, POLICIES_FOR, DELOAD_AFTER, MAX_BW_SETS
 } from './progression.js'
 import { entryExcluded } from './history.js'
@@ -847,5 +847,22 @@ describe('a weight off the increment grid keeps its offset when it goes up (issu
   it('still snaps from a weight that sits on the grid', () => {
     const p = nextPrescription(hist(LIFT, [[60, 5, 5, 5]]), { id: LIFT, sets: 3, reps: 5, weight: 60, prog: 'linear', inc: 2.5 })
     expect(p.weight).toBe(62.5)
+  })
+
+  it('keeps an off-grid machine load offset when deloading after three misses', () => {
+    const cfg = { id: LIFT, sets: 3, reps: 5, weight: 12.5, prog: 'linear', inc: 5 }
+    const target = { sets: 3, reps: 5, weight: 12.5 }
+    const p = nextPrescription(hist(LIFT, [
+      [12.5, 4, 4, 4],
+      [12.5, 4, 4, 4],
+      [12.5, 4, 4, 4],
+    ], target), cfg)
+    expect(p.kind).toBe('deload')
+    expect(p.weight).toBe(7.5)
+    expect(p.weight).not.toBe(10)
+  })
+
+  it('does not lift a machine below one step back onto the zero-origin grid', () => {
+    expect(deloadTo(2.5, 5)).toBe(2.5)
   })
 })
