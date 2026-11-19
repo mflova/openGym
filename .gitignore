@@ -21,3 +21,6 @@ node_modules
 junit.xml
 coverage/
 frontend/bundle-size.json
+
+# Provider credential cache — sign in again if lost
+coach-auth/
